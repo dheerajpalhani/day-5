@@ -1,18 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, CheckCircle2, Key, BarChart3, Mic, Download, Info, Smile, AlertCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateBlogSummary } from '../services/aiService';
 
-export default function AISummaryPanel() {
+export default function AISummaryPanel({ blog }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasSummary, setHasSummary] = useState(false);
+  const [dynamicSummary, setDynamicSummary] = useState(null);
 
-  const generateSummary = () => {
+  useEffect(() => {
+    setHasSummary(false);
+    setDynamicSummary(null);
+  }, [blog]);
+
+  const generateSummary = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    try {
+      const summary = await generateBlogSummary(blog.content);
+      if (summary) {
+        setDynamicSummary(summary);
+        setHasSummary(true);
+      } else {
+        // Fallback to local data if API fails (likely due to missing key)
+        setDynamicSummary(blog.summary);
+        setHasSummary(true);
+      }
+    } catch (error) {
+      setDynamicSummary(blog.summary);
       setHasSummary(true);
-    }, 2000);
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+
+  if (!blog) return null;
 
   return (
     <div className="sticky top-28 flex flex-col gap-12">
@@ -36,7 +58,7 @@ export default function AISummaryPanel() {
                 <h4 className="font-bold text-3xl text-slate-800">Ready to summarize?</h4>
                 <p className="text-xl text-slate-500 px-12 leading-relaxed">Our AI will process the article and extract the key takeaways in seconds.</p>
               </div>
-              <button 
+              <button
                 onClick={generateSummary}
                 className="mt-10 gradient-bg text-white px-14 py-6 rounded-3xl font-bold shadow-2xl shadow-violet-200 hover:scale-[1.05] transition-all active:scale-95"
               >
@@ -52,16 +74,16 @@ export default function AISummaryPanel() {
               <p className="text-center text-xl font-bold text-violet-400 animate-pulse mt-12">Processing article intelligence...</p>
             </div>
           ) : (
-            <motion.div 
-              initial={{ opacity: 0 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="space-y-16"
             >
               {/* Bullet Points */}
               <div className="space-y-12">
-                <SummaryPoint text="Next frontier shifts from LLMs to Agentic AI and Multimodal Reasoning." />
-                <SummaryPoint text="Autonomous agents prioritize planning, tool use, and self-correction." />
-                <SummaryPoint text="RAG and persistent state are overcoming context window limitations." />
+                {(dynamicSummary?.bullets || blog.summary.bullets).map((bullet, i) => (
+                  <SummaryPoint key={i} text={bullet} />
+                ))}
               </div>
 
               {/* Takeaways Section */}
@@ -71,17 +93,27 @@ export default function AISummaryPanel() {
                   <span className="text-[15px] font-black uppercase tracking-[0.4em] text-slate-400">Key Takeaways</span>
                 </div>
                 <div className="flex flex-wrap gap-6">
-                  <Badge text="Agentic Workflows" color="bg-blue-50 text-blue-600" />
-                  <Badge text="Multimodal" color="bg-purple-50 text-purple-600" />
-                  <Badge text="Autonomous" color="bg-emerald-50 text-emerald-600" />
+                  {(dynamicSummary?.keywords || blog.summary.keywords).map((keyword, i) => (
+                    <Badge key={i} text={keyword} color="bg-violet-50 text-violet-600" />
+                  ))}
                 </div>
               </div>
 
               {/* Metadata Grid */}
               <div className="grid grid-cols-2 gap-12">
-                <MetricBox icon={<Smile className="text-emerald-500" size={28} />} label="Sentiment" value="Positive" />
-                <MetricBox icon={<BarChart3 className="text-violet-500" size={28} />} label="Difficulty" value="Intermediate" />
+                <MetricBox 
+                  icon={<Smile className="text-emerald-500" size={28} />} 
+                  label="Sentiment" 
+                  value={dynamicSummary?.sentiment || blog.summary.sentiment} 
+                />
+                <MetricBox 
+                  icon={<BarChart3 className="text-violet-500" size={28} />} 
+                  label="Difficulty" 
+                  value={dynamicSummary?.difficulty || blog.summary.difficulty} 
+                />
               </div>
+
+
 
               {/* Actions */}
               <div className="pt-12 border-t border-slate-100 flex items-center justify-between gap-10">
@@ -103,7 +135,7 @@ export default function AISummaryPanel() {
       {/* Suggested Topics Card */}
       <AnimatePresence>
         {hasSummary && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="glass-card rounded-[48px] p-12"
